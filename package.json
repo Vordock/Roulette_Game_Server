@@ -11,6 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "debug": "^4.3.6",
+    "engine.io-client": "^6.6.0",
     "express": "^4.19.2",
     "http": "^0.0.1-security",
     "parsejson": "^0.0.3",
