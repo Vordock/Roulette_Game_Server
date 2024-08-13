@@ -1,0 +1,21 @@
+{
+  "name": "roulettecrashgameserver",
+  "version": "1.0.0",
+  "description": "Repository for websocket server of Roulette Crash game",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "http": "^0.0.1-security",
+    "parsejson": "^0.0.3",
+    "path": "^0.12.7",
+    "socket.io": "^4.7.5",
+    "socketio": "^1.0.0"
+  }
+}
