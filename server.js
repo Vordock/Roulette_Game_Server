@@ -9,6 +9,12 @@ const SERVER = http.createServer(APP);
 const IO_SERVER = new Server(SERVER);
 const PORT = 2108;
 
+const ROULETTE_TIME = 3000; // in ms
+const MULT_1 = 2;
+const MULT_2 = 5;
+
+const COLOR_CHANCE = 45;
+
 APP.use(express.static(path.join(__dirname, '/public')));
 APP.use('/favicon.ico', (req, res) => res.status(204).end());
 APP.get('/page', (req, res) => res.sendFile(path.join(__dirname, 'page/index.html')));
@@ -20,8 +26,29 @@ let user = {
     current_balance: 3521.00,
     current_bet_id: '',
     current_bet_value: 0,
-    current_multiplier: 1
+    current_color: ''
 };
+
+function EmitCrash(){
+
+    const randomValue = Math.random() * 100; // Gera um número entre 0 e 100
+    
+    let crashColor;
+
+    if (randomValue < COLOR_CHANCE) {
+        crashColor = 'blue';  // 45% de chance
+    } else if (randomValue < COLOR_CHANCE * 2) {
+        crashColor = 'red';   // 45% de chance
+    } else {
+        crashColor = 'gold';  // 10% de chance
+    }
+
+    user.last_color = crashColor;  
+
+    user.current_balance += crashColor === 'gold' ? user.current_bet_value *  MULT_2 : user.current_bet_value *  MULT_1;
+
+    IO_SERVER.emit('CRASH', { balance: user.current_balance, crashColor: crashColor});
+}
 
 IO_SERVER.on('connection', (socket) => {
 
@@ -30,8 +57,9 @@ IO_SERVER.on('connection', (socket) => {
         callback && callback({ status: 1, data: { balance: user.balance }, message: 'Player Authenticated!' });
 
     });
-  
+
     socket.on("PLACE_BET", (emitData, callback) => {
+
         console.log('\nAposta recebida:', emitData.amount);
 
         console.log(`Saldo atual: ${user.balance}`);
@@ -49,8 +77,14 @@ IO_SERVER.on('connection', (socket) => {
 
             user.current_bet_value = +emitData.amount;
 
-            callback && callback({ status: 1, data:{bet: {bet_id: user.bet_id}, user:{balance: user.balance}}, message: 'Bet Successful!' });
-            user.current_multiplier = 1;
+            user.current_color = emitdata.betColor;
+
+            callback && callback({ status: 1, data: { bet: { bet_id: user.bet_id }, user: { balance: user.balance } }, message: 'Bet Successful!' });
+
+            setTimeout(() => {
+                EmitCrash();
+            }, ROULETTE_TIME);
+
 
         } else {
             console.log('\nSaldo insuficiente:', user.balance, 'é menor que', emitData.amount, '\n');
@@ -60,7 +94,6 @@ IO_SERVER.on('connection', (socket) => {
 
     });
 
-    
     socket.on("PLACE_CASHOUT", (emitData, callback) => {
 
         if (emitData.bet_id === user.bet_id) {
@@ -78,11 +111,14 @@ IO_SERVER.on('connection', (socket) => {
 
             console.log('\nNovo saldo:', user.balance, '\n');
 
-            callback && callback({ status: 1, data:{bet: {withdraw: cashout}, user:{balance: user.balance}}, message: 'Cashout Successful!' });
+            callback && callback({ status: 1, data: { bet: { withdraw: cashout }, user: { balance: user.balance } }, message: 'Cashout Successful!' });
         } else {
-            callback && callback({ status: 0, data:{bet: {bet_id: user.bet_id}, user:{balance: user.balance}}, message: 'Invalid Cashout, bet ID not found!' });
+            callback && callback({ status: 0, data: { bet: { bet_id: user.bet_id }, user: { balance: user.balance } }, message: 'Invalid Cashout, bet ID not found!' });
             console.log('\nbet_id not found!\n');
         }
     });
+});
 
+SERVER.listen(PORT, () => {
+    console.log('Servidor online na porta: ' + PORT);
 });
