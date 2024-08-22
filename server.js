@@ -11,7 +11,7 @@ const PORT = 2108;
 
 const ROULETTE_TIME = 3000; // in ms
 const MULT_1 = 2;
-const MULT_2 = 5;
+const MULT_2 = 10;
 
 const COLOR_CHANCE = 45;
 
@@ -19,7 +19,7 @@ APP.use(express.static(path.join(__dirname, '/public')));
 APP.use('/favicon.ico', (req, res) => res.status(204).end());
 APP.get('/page', (req, res) => res.sendFile(path.join(__dirname, 'page/index.html')));
 APP.get('/game/1', (req, res) => res.sendFile(path.join(__dirname, 'game/1/index.html')));
-APP.get('/game/1', (req, res) => res.sendFile(path.join(__dirname, 'game/1/index.html')));
+APP.get('/game/2', (req, res) => res.sendFile(path.join(__dirname, 'game/2/index.html')));
 
 let user = {
     name: 'Mockado',
@@ -29,25 +29,32 @@ let user = {
     current_color: ''
 };
 
-function EmitCrash(){
+let crashColor;
+
+function SetRound() {
 
     const randomValue = Math.random() * 100; // Gera um número entre 0 e 100
-    
-    let crashColor;
 
     if (randomValue < COLOR_CHANCE) {
         crashColor = 'blue';  // 45% de chance
     } else if (randomValue < COLOR_CHANCE * 2) {
         crashColor = 'red';   // 45% de chance
     } else {
-        crashColor = 'gold';  // 10% de chance
+        crashColor = 'yellow';  // 10% de chance
     }
 
-    user.last_color = crashColor;  
+    if (user.last_color !== '') {
+        if (user.last_color === crashColor) {
+            
+            user.current_balance += crashColor === 'yellow' ? user.current_bet_value * MULT_2 : user.current_bet_value * MULT_1;
+            
+            IO_SERVER.emit('CASHOUT', { balance: user.current_balance, crashColor: crashColor });
+        }
 
-    user.current_balance += crashColor === 'gold' ? user.current_bet_value *  MULT_2 : user.current_bet_value *  MULT_1;
-
-    IO_SERVER.emit('CRASH', { balance: user.current_balance, crashColor: crashColor});
+        else {
+            IO_SERVER.emit('CRASH', { crashColor: crashColor });
+        }
+    }
 }
 
 IO_SERVER.on('connection', (socket) => {
@@ -55,7 +62,6 @@ IO_SERVER.on('connection', (socket) => {
     socket.on("USER_AUTH", (received, callback) => {
 
         callback && callback({ status: 1, data: { balance: user.balance }, message: 'Player Authenticated!' });
-
     });
 
     socket.on("PLACE_BET", (emitData, callback) => {
@@ -82,9 +88,8 @@ IO_SERVER.on('connection', (socket) => {
             callback && callback({ status: 1, data: { bet: { bet_id: user.bet_id }, user: { balance: user.balance } }, message: 'Bet Successful!' });
 
             setTimeout(() => {
-                EmitCrash();
+                SetRound();
             }, ROULETTE_TIME);
-
 
         } else {
             console.log('\nSaldo insuficiente:', user.balance, 'é menor que', emitData.amount, '\n');
