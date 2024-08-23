@@ -23,7 +23,7 @@ APP.get('/game/2', (req, res) => res.sendFile(path.join(__dirname, 'game/2/index
 
 let user = {
     name: 'Mockado',
-    current_balance: 3521.00,
+    current_balance: '3521.00',
     current_bet_id: '',
     current_bet_value: 0,
     current_color: ''
@@ -61,7 +61,7 @@ IO_SERVER.on('connection', (socket) => {
 
     socket.on("USER_AUTH", (received, callback) => {
 
-        callback && callback({ status: 1, data: { balance: user.balance }, message: 'Player Authenticated!' });
+        callback && callback({ status: 1, data: { balance: user.current_balance }, multiplies: [MULT_1,MULT_2], message: 'Player Authenticated!' });
     });
 
     socket.on("PLACE_BET", (emitData, callback) => {
