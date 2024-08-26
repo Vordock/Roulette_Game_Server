@@ -4,7 +4,7 @@
   "description": "Repository for websocket server of Roulette Crash game",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -15,6 +15,7 @@
     "debug": "^4.3.6",
     "express": "^4.19.2",
     "http": "^0.0.1-security",
+    "nodemon": "^3.1.4",
     "path": "^0.12.7",
     "socket.io": "^4.7.5"
   }

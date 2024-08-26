@@ -29,30 +29,34 @@ let user = {
     current_color: ''
 };
 
-let crashColor;
+let roundColor;
 
 function SetRound() {
 
     const randomValue = Math.random() * 100; // Gera um número entre 0 e 100
 
     if (randomValue < COLOR_CHANCE) {
-        crashColor = 'blue';  // 45% de chance
+        roundColor = 'blue';    // 45% de chance
     } else if (randomValue < COLOR_CHANCE * 2) {
-        crashColor = 'red';   // 45% de chance
+        roundColor = 'red';     // 45% de chance
     } else {
-        crashColor = 'yellow';  // 10% de chance
+        roundColor = 'yellow';  // 10% de chance
     }
 
     if (user.last_color !== '') {
-        if (user.last_color === crashColor) {
-            
-            user.current_balance += crashColor === 'yellow' ? user.current_bet_value * MULT_2 : user.current_bet_value * MULT_1;
-            
-            IO_SERVER.emit('CASHOUT', { balance: user.current_balance, crashColor: crashColor });
+        if (user.last_color === roundColor) {
+
+            let numericBalance = parseFloat(user.current_balance);
+
+            numericBalance += roundColor === 'yellow' ? user.current_bet_value * MULT_2 : user.current_bet_value * MULT_1;
+
+            IO_SERVER.emit('CASHOUT', { balance: numericBalance, roundColor: roundColor });
+
+            user.current_balance = numericBalance.toFixed(2);
         }
 
         else {
-            IO_SERVER.emit('CRASH', { crashColor: crashColor });
+            IO_SERVER.emit('CRASH', { roundColor: roundColor });
         }
     }
 }
@@ -61,69 +65,63 @@ IO_SERVER.on('connection', (socket) => {
 
     socket.on("USER_AUTH", (received, callback) => {
 
-        callback && callback({ status: 1, data: { balance: user.current_balance }, multiplies: [MULT_1,MULT_2], message: 'Player Authenticated!' });
+        callback && callback({
+            status: 1,
+            data: { balance: user.current_balance },
+            multiplies: [MULT_1, MULT_2],
+            message: 'Player Authenticated!'
+        });
     });
 
     socket.on("PLACE_BET", (emitData, callback) => {
 
+        console.log(emitData);
+
+        let numericBalance = parseFloat(user.current_balance);
+
         console.log('\nAposta recebida:', emitData.amount);
 
-        console.log(`Saldo atual: ${user.balance}`);
+        console.log(`Saldo atual: ${user.current_balance}`);
 
         const newBet_id = randomUUID();
 
-        user.bet_id = newBet_id;
+        user.current_bet_id = newBet_id;
 
-        console.log('    NOVO ID DE APOSTA: ', user.bet_id);
+        console.log('    NOVO ID DE APOSTA: ', user.current_bet_id);
 
-        if (user.balance >= +emitData.amount) {
-            user.balance -= +emitData.amount;
 
-            console.log('\nNovo saldo total:', user.balance, '\n');
+
+        if (numericBalance >= +emitData.amount) {
+
+            numericBalance -= +emitData.amount;
+
+            console.log('\nNovo saldo total:', numericBalance, '\n');
 
             user.current_bet_value = +emitData.amount;
 
-            user.current_color = emitdata.betColor;
+            user.current_color = emitData.betColor;
 
-            callback && callback({ status: 1, data: { bet: { bet_id: user.bet_id }, user: { balance: user.balance } }, message: 'Bet Successful!' });
+            callback && callback({
+                status: 1, data:
+                    { bet: { bet_id: user.current_bet_id }, user: { balance: numericBalance } },
+                message: 'Bet Successful!'
+            });
 
             setTimeout(() => {
                 SetRound();
             }, ROULETTE_TIME);
 
+            user.current_balance = numericBalance.toFixed(2);
+
         } else {
-            console.log('\nSaldo insuficiente:', user.balance, 'é menor que', emitData.amount, '\n');
+            console.log('\nSaldo insuficiente:', user.current_balance, 'é menor que', emitData.amount, '\n');
 
             callback && callback({ status: 0, message: 'Player balance is not enough.' });
         }
 
     });
-
-    socket.on("PLACE_CASHOUT", (emitData, callback) => {
-
-        if (emitData.bet_id === user.bet_id) {
-
-            console.log('user.current_bet_value: ', user.current_bet_value);
-            console.log('user.current_multiplier: ', user.current_multiplier);
-
-            // Calcular o cashout
-            const cashout = user.current_bet_value * user.current_multiplier;
-
-            // Adicionar o cashout ao saldo do usuário
-            user.balance += cashout;
-
-            console.log(user.name, 'fez um saque de:', cashout);
-
-            console.log('\nNovo saldo:', user.balance, '\n');
-
-            callback && callback({ status: 1, data: { bet: { withdraw: cashout }, user: { balance: user.balance } }, message: 'Cashout Successful!' });
-        } else {
-            callback && callback({ status: 0, data: { bet: { bet_id: user.bet_id }, user: { balance: user.balance } }, message: 'Invalid Cashout, bet ID not found!' });
-            console.log('\nbet_id not found!\n');
-        }
-    });
 });
 
 SERVER.listen(PORT, () => {
-    console.log('Servidor online na porta: ' + PORT);
+    console.log('\nServidor online na porta: ' + PORT);
 });
