@@ -37,22 +37,25 @@ function SetRound() {
 
     if (randomValue < COLOR_CHANCE) {
         roundColor = 'blue';    // 45% de chance
+
     } else if (randomValue < COLOR_CHANCE * 2) {
         roundColor = 'red';     // 45% de chance
+
     } else {
         roundColor = 'yellow';  // 10% de chance
     }
 
-    if (user.last_color !== '') {
-        if (user.last_color === roundColor) {
+    if (user.current_color !== '') {
+        if (user.current_color === roundColor) {
 
             let numericBalance = parseFloat(user.current_balance);
 
             numericBalance += roundColor === 'yellow' ? user.current_bet_value * MULT_2 : user.current_bet_value * MULT_1;
 
-            IO_SERVER.emit('CASHOUT', { balance: numericBalance, roundColor: roundColor });
-
             user.current_balance = numericBalance.toFixed(2);
+
+            IO_SERVER.emit('CASHOUT', { data: {balance: user.current_balance}, roundColor: roundColor });
+ 
         }
 
         else {
@@ -89,8 +92,6 @@ IO_SERVER.on('connection', (socket) => {
 
         console.log('    NOVO ID DE APOSTA: ', user.current_bet_id);
 
-
-
         if (numericBalance >= +emitData.amount) {
 
             numericBalance -= +emitData.amount;
@@ -112,6 +113,8 @@ IO_SERVER.on('connection', (socket) => {
             }, ROULETTE_TIME);
 
             user.current_balance = numericBalance.toFixed(2);
+            console.log(user.current_balance);
+            
 
         } else {
             console.log('\nSaldo insuficiente:', user.current_balance, 'é menor que', emitData.amount, '\n');
