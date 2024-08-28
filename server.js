@@ -55,7 +55,6 @@ function SetRound() {
             user.current_balance = numericBalance.toFixed(2);
 
             IO_SERVER.emit('CASHOUT', { data: {balance: user.current_balance}, roundColor: roundColor });
- 
         }
 
         else {
@@ -90,7 +89,7 @@ IO_SERVER.on('connection', (socket) => {
 
         user.current_bet_id = newBet_id;
 
-        console.log('    NOVO ID DE APOSTA: ', user.current_bet_id);
+        console.log('    BET ID: ', user.current_bet_id);
 
         if (numericBalance >= +emitData.amount) {
 
@@ -102,6 +101,8 @@ IO_SERVER.on('connection', (socket) => {
 
             user.current_color = emitData.betColor;
 
+            user.current_balance = numericBalance.toFixed(2);
+
             callback && callback({
                 status: 1, data:
                     { bet: { bet_id: user.current_bet_id }, user: { balance: numericBalance } },
@@ -112,10 +113,8 @@ IO_SERVER.on('connection', (socket) => {
                 SetRound();
             }, ROULETTE_TIME);
 
-            user.current_balance = numericBalance.toFixed(2);
             console.log(user.current_balance);
             
-
         } else {
             console.log('\nSaldo insuficiente:', user.current_balance, 'é menor que', emitData.amount, '\n');
 
@@ -123,7 +122,51 @@ IO_SERVER.on('connection', (socket) => {
         }
 
     });
+
+    socket.on("HISTORY_PLAYER", (arg, callback) => {
+        const HISTORY = generateRandomList(10);
+
+        callback && callback({ data: { HISTORY: HISTORY } });
+    });
+    
+    socket.on('disconnect', () => {
+        console.log('\nO usuario', user.name, 'se desconectou!\n');
+    });
 });
+
+function getRandomDate() {
+    const start = new Date(2024, 5, 14, 11, 43, 0); // 14/06/2024 11:43:00
+    const end = new Date(2024, 5, 14, 12, 0, 0); // 14/06/2024 12:00:00
+    const date = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+    return date.toISOString().replace('T', ' ').split('.')[0]; // Formata para "dd/MM/yyyy HH:mm:ss"
+}
+
+function getRandomType() {
+    return "win"; 
+}
+
+function getRandomValue(limit) {
+    return (1 + Math.random() * (limit + 1)).toFixed(2);
+}
+
+function getRandomCrash() {
+    return (Math.random() * (2 - 1.01) + 1.01).toFixed(2); // Valores de crash
+}
+
+function generateRandomList(numEntries) {
+    const myList = [];
+    for (let i = 0; i < numEntries; i++) {
+        myList.push({
+            data: getRandomDate(),
+            type: getRandomType(),
+            aposta: getRandomValue(100),
+            crash: getRandomCrash(),
+            cashout: getRandomValue(100)
+        });
+    }
+    return myList;
+}
+
 
 SERVER.listen(PORT, () => {
     console.log('\nServidor online na porta: ' + PORT);
