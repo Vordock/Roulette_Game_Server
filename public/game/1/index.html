@@ -54,7 +54,7 @@
     <div id="unity-container">
         <canvas id="unity-canvas" width=auto height=auto tabindex="-1"></canvas>
     </div>
-    <script src="Build/7.loader.js"></script>
+    <script src="Build/1.loader.js"></script>
     <script>
         window.gameInstance = null;
 
@@ -84,13 +84,13 @@
         }
 
         createUnityInstance(document.querySelector("#unity-canvas"), {
-            dataUrl: "Build/7.data.unityweb",
-            frameworkUrl: "Build/7.framework.js.unityweb",
-        codeUrl: "Build/7.wasm.unityweb",
+            dataUrl: "Build/1.data.unityweb",
+            frameworkUrl: "Build/1.framework.js.unityweb",
+        codeUrl: "Build/1.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
             companyName: "FDS Games",
             productName: "Fruitable",
-            productVersion: "1.0.8",
+            productVersion: "1.1.0",
     }).then((unityInstance) => {
                 gameInstance = unityInstance;
                 adjustCanvasSize();
