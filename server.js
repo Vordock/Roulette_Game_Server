@@ -73,6 +73,8 @@ IO_SERVER.on('connection', (socket) => {
             multiplies: [MULT_1, MULT_2],
             message: 'Player Authenticated!'
         });
+
+        console.log('\nO usuario', user.name, 'se conectou!\n');
     });
 
     socket.on("PLACE_BET", (emitData, callback) => {
@@ -89,7 +91,7 @@ IO_SERVER.on('connection', (socket) => {
 
         user.current_bet_id = newBet_id;
 
-        console.log('    BET ID: ', user.current_bet_id);
+        //console.log('    BET ID: ', user.current_bet_id);
 
         if (numericBalance >= +emitData.amount) {
 
@@ -112,8 +114,6 @@ IO_SERVER.on('connection', (socket) => {
             setTimeout(() => {
                 SetRound();
             }, ROULETTE_TIME);
-
-            console.log(user.current_balance);
             
         } else {
             console.log('\nSaldo insuficiente:', user.current_balance, 'é menor que', emitData.amount, '\n');
