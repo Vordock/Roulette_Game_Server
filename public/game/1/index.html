@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Fruitable Online</title>
+    <title>Disel Line Online</title>
 
     <script type="module">
         import { io } from 'https://cdn.socket.io/4.7.4/socket.io.esm.min.js';
@@ -23,7 +23,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Para evitar que o conteúdo se desloque ao abrir o teclado em dispositivos móveis */
+            /* Para evitar que o conteudo se desloque ao abrir o teclado em dispositivos moveis */
         }
 
         #unity-container {
@@ -38,9 +38,9 @@
 
         #unity-canvas {
             width: 100vw;
-            /* largura do canvas para preencher toda a largura visível do navegador */
+            /* largura do canvas para preencher toda a largura visivel do navegador */
             height: 100vh;
-            /* altura do canvas para preencher toda a altura visível do navegador */
+            /* altura do canvas para preencher toda a altura visivel do navegador */
             max-width: 100%;
             /* largura do canvas */
             max-height: 100%;
@@ -86,11 +86,11 @@
         createUnityInstance(document.querySelector("#unity-canvas"), {
             dataUrl: "Build/1.data.unityweb",
             frameworkUrl: "Build/1.framework.js.unityweb",
-        codeUrl: "Build/1.wasm.unityweb",
-        streamingAssetsUrl: "StreamingAssets",
+            codeUrl: "Build/1.wasm.unityweb",
+            streamingAssetsUrl: "StreamingAssets",
             companyName: "FDS Games",
-            productName: "Fruitable",
-            productVersion: "1.1.8",
+            productName: "Disel Line",
+            productVersion: "1.1.6",
     }).then((unityInstance) => {
                 gameInstance = unityInstance;
                 adjustCanvasSize();

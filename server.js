@@ -11,7 +11,7 @@ const PORT = 2108;
 
 const ROULETTE_TIME = 3000; // in ms
 const MULT_1 = 2;
-const MULT_2 = 10;
+const MULT_2 = 5;
 
 const COLOR_CHANCE = 45;
 
@@ -50,11 +50,15 @@ function SetRound() {
 
             let numericBalance = parseFloat(user.current_balance);
 
-            numericBalance += roundColor === 'yellow' ? user.current_bet_value * MULT_2 : user.current_bet_value * MULT_1;
+            let cashoutValue = roundColor === 'yellow' ? user.current_bet_value * MULT_2 : user.current_bet_value * MULT_1;
+
+            numericBalance += cashoutValue;
 
             user.current_balance = numericBalance.toFixed(2);
 
             IO_SERVER.emit('CASHOUT', { data: {balance: user.current_balance}, roundColor: roundColor });
+
+            console.log('Saque realizado:', cashoutValue, '\nNovo saldo: ', user.current_balance,'\n');
         }
 
         else {
@@ -74,18 +78,16 @@ IO_SERVER.on('connection', (socket) => {
             message: 'Player Authenticated!'
         });
 
-        console.log('\nO usuario', user.name, 'se conectou!\n');
+        console.log('\n',user.name,'se conectou com saldo',+user.current_balance,'\n');
     });
 
     socket.on("PLACE_BET", (emitData, callback) => {
 
-        console.log(emitData);
+        //console.log(emitData);
 
         let numericBalance = parseFloat(user.current_balance);
 
-        console.log('\nAposta recebida:', emitData.amount);
-
-        console.log(`Saldo atual: ${user.current_balance}`);
+        console.log('Aposta recebida:', emitData.amount);
 
         const newBet_id = randomUUID();
 
@@ -97,13 +99,15 @@ IO_SERVER.on('connection', (socket) => {
 
             numericBalance -= +emitData.amount;
 
-            console.log('\nNovo saldo total:', numericBalance, '\n');
+            //console.log('\nNovo saldo total:', numericBalance, '\n');
 
             user.current_bet_value = +emitData.amount;
 
             user.current_color = emitData.betColor;
 
             user.current_balance = numericBalance.toFixed(2);
+
+            console.log('Novo saldo: ', user.current_balance,'\n');
 
             callback && callback({
                 status: 1, data:
@@ -166,7 +170,6 @@ function generateRandomList(numEntries) {
     }
     return myList;
 }
-
 
 SERVER.listen(PORT, () => {
     console.log('\nServidor online na porta: ' + PORT);
