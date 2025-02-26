@@ -1,8 +1,9 @@
-const express = require('express');
-const http = require('http');
-const path = require('path');
-const { Server } = require('socket.io');
-const { randomUUID } = require('crypto');
+const express = require("express");
+const http = require("http");
+const path = require("path");
+const { Server } = require("socket.io");
+const { randomUUID } = require("crypto");
+const { time } = require("console");
 
 const APP = express();
 const SERVER = http.createServer(APP);
@@ -15,162 +16,237 @@ const MULT_2 = 5;
 
 const COLOR_CHANCE = 45;
 
-APP.use(express.static(path.join(__dirname, '/public')));
-APP.use('/favicon.ico', (req, res) => res.status(204).end());
-APP.get('/page', (req, res) => res.sendFile(path.join(__dirname, 'page/index.html')));
-APP.get('/game/1', (req, res) => res.sendFile(path.join(__dirname, 'game/1/index.html')));
-APP.get('/game/2', (req, res) => res.sendFile(path.join(__dirname, 'game/2/index.html')));
+APP.use(express.static(path.join(__dirname, "/public")));
+APP.use("/favicon.ico", (req, res) => res.status(204).end());
+APP.get("/page", (req, res) =>
+  res.sendFile(path.join(__dirname, "page/index.html"))
+);
+APP.get("/game/1", (req, res) =>
+  res.sendFile(path.join(__dirname, "game/1/index.html"))
+);
+APP.get("/game/2", (req, res) =>
+  res.sendFile(path.join(__dirname, "game/2/index.html"))
+);
 
 let user = {
-    name: 'Mockado',
-    current_balance: '3521.00',
-    current_bet_id: '',
-    current_bet_value: 0,
-    current_color: ''
+  name: "Mockado",
+  current_balance: "3521.00",
+  current_bet_id: "",
+  current_bet_value: 0,
+  current_color: "",
 };
+
+const GAME_PHASE = [
+  { status: "OFF_ROUND", time: 3000 },
+  { status: "BETTING", time: 3000 },
+  { status: "ON_ROUND", time: null },
+];
 
 let roundColor;
 
 function SetRound() {
+  const randomValue = Math.random() * 100; // Gera um número entre 0 e 100
 
-    const randomValue = Math.random() * 100; // Gera um número entre 0 e 100
+  if (randomValue < COLOR_CHANCE) {
+    roundColor = "blue"; // 45% de chance
+  } else if (randomValue < COLOR_CHANCE * 2) {
+    roundColor = "red"; // 45% de chance
+  } else {
+    roundColor = "yellow"; // 10% de chance
+  }
 
-    if (randomValue < COLOR_CHANCE) {
-        roundColor = 'blue';    // 45% de chance
+  if (user.current_color !== "") {
+    if (user.current_color === roundColor) {
+      let numericBalance = parseFloat(user.current_balance);
 
-    } else if (randomValue < COLOR_CHANCE * 2) {
-        roundColor = 'red';     // 45% de chance
+      let cashoutValue =
+        roundColor === "yellow"
+          ? user.current_bet_value * MULT_2
+          : user.current_bet_value * MULT_1;
 
+      numericBalance += cashoutValue;
+
+      user.current_balance = numericBalance.toFixed(2);
+
+      IO_SERVER.emit("CASHOUT", {
+        data: { balance: user.current_balance },
+        roundColor: roundColor,
+      });
+
+      console.log(
+        "Saque realizado:",
+        cashoutValue,
+        "\nNovo saldo: ",
+        user.current_balance,
+        "\n"
+      );
     } else {
-        roundColor = 'yellow';  // 10% de chance
+      IO_SERVER.emit("CRASH", { roundColor: roundColor });
     }
-
-    if (user.current_color !== '') {
-        if (user.current_color === roundColor) {
-
-            let numericBalance = parseFloat(user.current_balance);
-
-            let cashoutValue = roundColor === 'yellow' ? user.current_bet_value * MULT_2 : user.current_bet_value * MULT_1;
-
-            numericBalance += cashoutValue;
-
-            user.current_balance = numericBalance.toFixed(2);
-
-            IO_SERVER.emit('CASHOUT', { data: {balance: user.current_balance}, roundColor: roundColor });
-
-            console.log('Saque realizado:', cashoutValue, '\nNovo saldo: ', user.current_balance,'\n');
-        }
-
-        else {
-            IO_SERVER.emit('CRASH', { roundColor: roundColor });
-        }
-    }
+  }
 }
 
-IO_SERVER.on('connection', (socket) => {
+IO_SERVER.on("connection", (socket) => {
+  socket.on("USER_AUTH", (received, callback) => {
+    callback &&
+      callback({
+        status: 1,
+        data: { balance: user.current_balance },
+        multiplies: [MULT_1, MULT_2],
+        message: "Player Authenticated!",
+      });
 
-    socket.on("USER_AUTH", (received, callback) => {
+    console.log(
+      "\n",
+      user.name,
+      "se conectou com saldo",
+      +user.current_balance,
+      "\n"
+    );
+  });
 
-        callback && callback({
-            status: 1,
-            data: { balance: user.current_balance },
-            multiplies: [MULT_1, MULT_2],
-            message: 'Player Authenticated!'
+  socket.on("PLACE_BET", (emitData, callback) => {
+    //console.log(emitData);
+
+    let numericBalance = parseFloat(user.current_balance);
+
+    console.log("Aposta recebida:", emitData.amount);
+
+    const newBet_id = randomUUID();
+
+    user.current_bet_id = newBet_id;
+
+    //console.log('    BET ID: ', user.current_bet_id);
+
+    if (numericBalance >= +emitData.amount) {
+      numericBalance -= +emitData.amount;
+
+      //console.log('\nNovo saldo total:', numericBalance, '\n');
+
+      user.current_bet_value = +emitData.amount;
+
+      user.current_color = emitData.betColor;
+
+      user.current_balance = numericBalance.toFixed(2);
+
+      console.log("Novo saldo: ", user.current_balance, "\n");
+
+      callback &&
+        callback({
+          status: 1,
+          data: {
+            bet: { bet_id: user.current_bet_id },
+            user: { balance: numericBalance },
+          },
+          message: "Bet Successful!",
         });
 
-        console.log('\n',user.name,'se conectou com saldo',+user.current_balance,'\n');
-    });
+      setTimeout(() => {
+        SetRound();
+      }, ROULETTE_TIME);
+    } else {
+      console.log(
+        "\nSaldo insuficiente:",
+        user.current_balance,
+        "é menor que",
+        emitData.amount,
+        "\n"
+      );
 
-    socket.on("PLACE_BET", (emitData, callback) => {
+      callback &&
+        callback({ status: 0, message: "Player balance is not enough." });
+    }
+  });
 
-        //console.log(emitData);
+  socket.on("HISTORY_PLAYER", (arg, callback) => {
+    const HISTORY = generateRandomList(10);
 
-        let numericBalance = parseFloat(user.current_balance);
+    callback && callback({ data: { HISTORY: HISTORY } });
+  });
 
-        console.log('Aposta recebida:', emitData.amount);
-
-        const newBet_id = randomUUID();
-
-        user.current_bet_id = newBet_id;
-
-        //console.log('    BET ID: ', user.current_bet_id);
-
-        if (numericBalance >= +emitData.amount) {
-
-            numericBalance -= +emitData.amount;
-
-            //console.log('\nNovo saldo total:', numericBalance, '\n');
-
-            user.current_bet_value = +emitData.amount;
-
-            user.current_color = emitData.betColor;
-
-            user.current_balance = numericBalance.toFixed(2);
-
-            console.log('Novo saldo: ', user.current_balance,'\n');
-
-            callback && callback({
-                status: 1, data:
-                    { bet: { bet_id: user.current_bet_id }, user: { balance: numericBalance } },
-                message: 'Bet Successful!'
-            });
-
-            setTimeout(() => {
-                SetRound();
-            }, ROULETTE_TIME);
-            
-        } else {
-            console.log('\nSaldo insuficiente:', user.current_balance, 'é menor que', emitData.amount, '\n');
-
-            callback && callback({ status: 0, message: 'Player balance is not enough.' });
-        }
-
-    });
-
-    socket.on("HISTORY_PLAYER", (arg, callback) => {
-        const HISTORY = generateRandomList(10);
-
-        callback && callback({ data: { HISTORY: HISTORY } });
-    });
-    
-    socket.on('disconnect', () => {
-        console.log('\nO usuario', user.name, 'se desconectou!\n');
-    });
+  socket.on("disconnect", () => {
+    console.log("\nO usuario", user.name, "se desconectou!\n");
+  });
 });
 
 function getRandomDate() {
-    const start = new Date(2024, 5, 14, 11, 43, 0); // 14/06/2024 11:43:00
-    const end = new Date(2024, 5, 14, 12, 0, 0); // 14/06/2024 12:00:00
-    const date = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-    return date.toISOString().replace('T', ' ').split('.')[0]; // Formata para "dd/MM/yyyy HH:mm:ss"
+  const start = new Date(2024, 5, 14, 11, 43, 0); // 14/06/2024 11:43:00
+  const end = new Date(2024, 5, 14, 12, 0, 0); // 14/06/2024 12:00:00
+  const date = new Date(
+    start.getTime() + Math.random() * (end.getTime() - start.getTime())
+  );
+  return date.toISOString().replace("T", " ").split(".")[0]; // Formata para "dd/MM/yyyy HH:mm:ss"
 }
 
 function getRandomType() {
-    return "win"; 
+  return "win";
 }
 
 function getRandomValue(limit) {
-    return (1 + Math.random() * (limit + 1)).toFixed(2);
+  return (1 + Math.random() * (limit + 1)).toFixed(2);
 }
 
 function getRandomCrash() {
-    return (Math.random() * (2 - 1.01) + 1.01).toFixed(2); // Valores de crash
+  return (Math.random() * (2 - 1.01) + 1.01).toFixed(2); // Valores de crash
 }
 
 function generateRandomList(numEntries) {
-    const myList = [];
-    for (let i = 0; i < numEntries; i++) {
-        myList.push({
-            data: getRandomDate(),
-            type: getRandomType(),
-            aposta: getRandomValue(100),
-            crash: getRandomCrash(),
-            cashout: getRandomValue(100)
-        });
-    }
-    return myList;
+  const myList = [];
+  for (let i = 0; i < numEntries; i++) {
+    myList.push({
+      data: getRandomDate(),
+      type: getRandomType(),
+      aposta: getRandomValue(100),
+      crash: getRandomCrash(),
+      cashout: getRandomValue(100),
+    });
+  }
+  return myList;
+}
+
+function sendGlobal(namespace, message) {
+  console.log(`Enviando mensagem global para ${namespace}:`, message, "\n");
+  IO_SERVER.emit(namespace, { message });
+}
+
+function StartOffRound() {
+  //console.log("Iniciando rodada OFF");
+  sendGlobal("GAME_CYCLE", {
+    status: GAME_PHASE[0].status,
+    interval: GAME_PHASE[0].interval,
+  });
+
+  IO_SERVER.emit("HISTORY", { message: lastsCrashs });
+
+  IO_SERVER.emit("CRASH");
+  setTimeout(StartBetting, GAME_PHASE[0].interval);
+}
+
+function StartBetting() {
+  //console.log("Iniciando rodada de apostas");
+  current_multiplier = 1;
+
+  sendGlobal("GAME_CYCLE", {
+    status: GAME_PHASE[1].status,
+    interval: GAME_PHASE[1].interval,
+  });
+  setTimeout(StartOnRound, GAME_PHASE[1].interval);
+}
+
+function StartOnRound() {
+  //console.log("Iniciando rodada de jogo (ON_ROUND)");
+
+  crash_multiplier = generateMultiply();
+
+  sendGlobal("GAME_CYCLE", {
+    status: GAME_PHASE[2].status,
+    interval: GAME_PHASE[2].interval,
+  });
+
+  console.log("Crash em:", parseFloat(crash_multiplier), "\n");
 }
 
 SERVER.listen(PORT, () => {
-    console.log('\nServidor online na porta: ' + PORT);
+  console.log("\nServidor online na porta: " + PORT);
+  StartOffRound();
 });
