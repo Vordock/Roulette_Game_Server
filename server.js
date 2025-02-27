@@ -39,7 +39,7 @@ let user = {
 const GAME_PHASE = [
   { status: "OFF_ROUND", time: 3000 },
   { status: "BETTING", time: 3000 },
-  { status: "ON_ROUND", time: null },
+  { status: "ON_ROUND", time: 3000 },
 ];
 
 let roundColor;
@@ -91,7 +91,7 @@ IO_SERVER.on("connection", (socket) => {
     callback &&
       callback({
         status: 1,
-        data: { balance: user.current_balance },
+        balance: user.current_balance,
         multiplies: [MULT_1, MULT_2],
         message: "Player Authenticated!",
       });
@@ -134,10 +134,8 @@ IO_SERVER.on("connection", (socket) => {
       callback &&
         callback({
           status: 1,
-          data: {
-            bet: { bet_id: user.current_bet_id },
-            user: { balance: numericBalance },
-          },
+          betid: newBet_id,
+          balance: user.current_balance,
           message: "Bet Successful!",
         });
 
@@ -161,7 +159,7 @@ IO_SERVER.on("connection", (socket) => {
   socket.on("HISTORY_PLAYER", (arg, callback) => {
     const HISTORY = generateRandomList(10);
 
-    callback && callback({ data: { HISTORY: HISTORY } });
+    callback && callback({ data: HISTORY });
   });
 
   socket.on("disconnect", () => {
@@ -213,13 +211,20 @@ function StartOffRound() {
   //console.log("Iniciando rodada OFF");
   sendGlobal("GAME_CYCLE", {
     status: GAME_PHASE[0].status,
-    interval: GAME_PHASE[0].interval,
+    interval: GAME_PHASE[0].time,
   });
 
-  IO_SERVER.emit("HISTORY", { message: lastsCrashs });
+  //IO_SERVER.emit("HISTORY", { message: lastsCrashs });
+  var randomColor;
 
-  IO_SERVER.emit("CRASH");
-  setTimeout(StartBetting, GAME_PHASE[0].interval);
+  randomColor = Math.floor(Math.random() * 3);
+
+  IO_SERVER.emit("CRASH", {
+    roundColor: randomColor,
+  });
+
+  console.log("Crash no index:", parseInt(randomColor), "\n");
+  setTimeout(StartBetting, GAME_PHASE[0].time);
 }
 
 function StartBetting() {
@@ -228,22 +233,24 @@ function StartBetting() {
 
   sendGlobal("GAME_CYCLE", {
     status: GAME_PHASE[1].status,
-    interval: GAME_PHASE[1].interval,
+    interval: GAME_PHASE[1].time,
   });
-  setTimeout(StartOnRound, GAME_PHASE[1].interval);
+  setTimeout(StartOnRound, GAME_PHASE[1].time);
 }
 
 function StartOnRound() {
   //console.log("Iniciando rodada de jogo (ON_ROUND)");
 
-  crash_multiplier = generateMultiply();
+  //crash_multiplier = generateMultiply();
 
   sendGlobal("GAME_CYCLE", {
     status: GAME_PHASE[2].status,
-    interval: GAME_PHASE[2].interval,
+    interval: GAME_PHASE[2].time,
   });
 
-  console.log("Crash em:", parseFloat(crash_multiplier), "\n");
+  setTimeout(StartOffRound, GAME_PHASE[2].time);
+
+  //console.log("Crash em:", parseFloat(crash_multiplier), "\n");
 }
 
 SERVER.listen(PORT, () => {
