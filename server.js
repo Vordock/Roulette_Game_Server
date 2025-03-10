@@ -33,7 +33,8 @@ let user = {
   current_balance: "3521.00",
   current_bet_id: "",
   current_bet_value: 0,
-  current_color: "",
+  current_color: -1,
+  betted: false,
 };
 
 const GAME_PHASE = [
@@ -44,45 +45,29 @@ const GAME_PHASE = [
 
 let roundColor;
 
-function SetRound() {
-  const randomValue = Math.random() * 100; // Gera um número entre 0 e 100
+function SetResult() {
+  if (user.current_color === roundColor) {
+    let numericBalance = parseFloat(user.current_balance);
 
-  if (randomValue < COLOR_CHANCE) {
-    roundColor = "blue"; // 45% de chance
-  } else if (randomValue < COLOR_CHANCE * 2) {
-    roundColor = "red"; // 45% de chance
-  } else {
-    roundColor = "yellow"; // 10% de chance
-  }
+    let cashoutValue =
+      roundColor === 2
+        ? user.current_bet_value * MULT_2
+        : user.current_bet_value * MULT_1;
 
-  if (user.current_color !== "") {
-    if (user.current_color === roundColor) {
-      let numericBalance = parseFloat(user.current_balance);
+    numericBalance += cashoutValue;
 
-      let cashoutValue =
-        roundColor === "yellow"
-          ? user.current_bet_value * MULT_2
-          : user.current_bet_value * MULT_1;
+    user.current_balance = numericBalance.toFixed(2);
 
-      numericBalance += cashoutValue;
-
-      user.current_balance = numericBalance.toFixed(2);
-
-      IO_SERVER.emit("CASHOUT", {
-        data: { balance: user.current_balance },
-        roundColor: roundColor,
-      });
-
-      console.log(
-        "Saque realizado:",
-        cashoutValue,
-        "\nNovo saldo: ",
-        user.current_balance,
-        "\n"
-      );
-    } else {
-      IO_SERVER.emit("CRASH", { roundColor: roundColor });
-    }
+    console.log(
+      "Saque realizado:",
+      cashoutValue,
+      "\nNovo saldo: ",
+      user.current_balance,
+      "\n"
+    );
+    IO_SERVER.emit("CASHOUT", {
+      balance: user.current_balance,
+    });
   }
 }
 
@@ -92,9 +77,13 @@ IO_SERVER.on("connection", (socket) => {
       callback({
         status: 1,
         balance: user.current_balance,
-        multiplies: [MULT_1, MULT_2],
         message: "Player Authenticated!",
       });
+
+    IO_SERVER.emit("BET_CONFIG", {
+      multiplies: [MULT_1, MULT_2],
+      maxbet: 500, // Example max bet value
+    });
 
     console.log(
       "\n",
@@ -139,9 +128,7 @@ IO_SERVER.on("connection", (socket) => {
           message: "Bet Successful!",
         });
 
-      setTimeout(() => {
-        SetRound();
-      }, ROULETTE_TIME);
+      user.betted = true;
     } else {
       console.log(
         "\nSaldo insuficiente:",
@@ -156,6 +143,39 @@ IO_SERVER.on("connection", (socket) => {
     }
   });
 
+  socket.on("PLACE_BET_CANCEL", (emitData, callback) => {
+    if (user.current_bet_id === emitData.betid) {
+      console.log("Aposta cancelada:", emitData.betid);
+
+      let numericBalance = parseFloat(user.current_balance);
+
+      numericBalance += user.current_bet_value;
+
+      user.current_balance = numericBalance.toFixed(2);
+
+      //console.log("Novo saldo:", user.current_balance, "\n");
+
+      callback &&
+        callback({
+          status: 1,
+          balance: user.current_balance,
+          message: "Bet Canceled!",
+        });
+
+      user.current_bet_id = "";
+      user.current_bet_value = 0;
+      user.current_color = -1;
+    } else {
+      console.log("Aposta não encontrada:", emitData.betid);
+
+      callback &&
+        callback({
+          status: 0,
+          message: "Bet not found!",
+        });
+    }
+  });
+
   socket.on("HISTORY_PLAYER", (arg, callback) => {
     const HISTORY = generateRandomList(10);
 
@@ -166,6 +186,56 @@ IO_SERVER.on("connection", (socket) => {
     console.log("\nO usuario", user.name, "se desconectou!\n");
   });
 });
+
+function sendGlobal(namespace, message) {
+  console.log(`Enviando mensagem global => ${namespace}:`, message, "\n");
+  IO_SERVER.emit(namespace, { message });
+}
+
+function StartBetting() {
+  user.betted = false;
+
+  user.current_color = -1;
+
+  //console.log("Iniciando rodada de apostas");
+  //current_multiplier = 1;
+
+  sendGlobal("GAME_CYCLE", {
+    status: GAME_PHASE[1].status,
+    interval: GAME_PHASE[1].time,
+  });
+  setTimeout(StartOnRound, GAME_PHASE[1].time);
+}
+
+function StartOnRound() {
+  sendGlobal("GAME_CYCLE", {
+    status: GAME_PHASE[2].status,
+    interval: GAME_PHASE[2].time,
+  });
+
+  roundColor = Math.floor(Math.random() * 3);
+
+  IO_SERVER.emit("CRASH", { roundColor: roundColor });
+
+  console.log("Crash no index:", parseInt(roundColor), "\n");
+
+  setTimeout(StartOffRound, GAME_PHASE[2].time);
+  //console.log("Crash em:", parseFloat(crash_multiplier), "\n");
+}
+
+function StartOffRound() {
+  //console.log("Iniciando rodada OFF");
+  sendGlobal("GAME_CYCLE", {
+    status: GAME_PHASE[0].status,
+    interval: GAME_PHASE[0].time,
+  });
+
+  //IO_SERVER.emit("HISTORY", { message: lastsCrashs });
+
+  SetResult();
+
+  setTimeout(StartBetting, GAME_PHASE[0].time);
+}
 
 function getRandomDate() {
   const start = new Date(2024, 5, 14, 11, 43, 0); // 14/06/2024 11:43:00
@@ -200,57 +270,6 @@ function generateRandomList(numEntries) {
     });
   }
   return myList;
-}
-
-function sendGlobal(namespace, message) {
-  console.log(`Enviando mensagem global para ${namespace}:`, message, "\n");
-  IO_SERVER.emit(namespace, { message });
-}
-
-function StartOffRound() {
-  //console.log("Iniciando rodada OFF");
-  sendGlobal("GAME_CYCLE", {
-    status: GAME_PHASE[0].status,
-    interval: GAME_PHASE[0].time,
-  });
-
-  //IO_SERVER.emit("HISTORY", { message: lastsCrashs });
-  var randomColor;
-
-  randomColor = Math.floor(Math.random() * 3);
-
-  IO_SERVER.emit("CRASH", {
-    roundColor: randomColor,
-  });
-
-  console.log("Crash no index:", parseInt(randomColor), "\n");
-  setTimeout(StartBetting, GAME_PHASE[0].time);
-}
-
-function StartBetting() {
-  //console.log("Iniciando rodada de apostas");
-  current_multiplier = 1;
-
-  sendGlobal("GAME_CYCLE", {
-    status: GAME_PHASE[1].status,
-    interval: GAME_PHASE[1].time,
-  });
-  setTimeout(StartOnRound, GAME_PHASE[1].time);
-}
-
-function StartOnRound() {
-  //console.log("Iniciando rodada de jogo (ON_ROUND)");
-
-  //crash_multiplier = generateMultiply();
-
-  sendGlobal("GAME_CYCLE", {
-    status: GAME_PHASE[2].status,
-    interval: GAME_PHASE[2].time,
-  });
-
-  setTimeout(StartOffRound, GAME_PHASE[2].time);
-
-  //console.log("Crash em:", parseFloat(crash_multiplier), "\n");
 }
 
 SERVER.listen(PORT, () => {
